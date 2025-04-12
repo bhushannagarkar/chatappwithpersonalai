@@ -67,7 +67,7 @@ module.exports = (io, socket) => {
       "members"
     );
 
-    // processing for AI chatbot
+    // processing for Health Assistant
     conversation.members.forEach(async (member) => {
       if (member._id != senderId && member.email.endsWith("bot")) {
         // this member is a bot

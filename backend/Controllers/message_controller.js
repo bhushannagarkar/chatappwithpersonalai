@@ -169,73 +169,113 @@ const getPresignedUrl = async (req, res) => {
 };
 
 const getAiResponse = async (prompt, senderId, conversationId) => {
-  var currentMessages = [];
-  const conv = await Conversation.findById(conversationId);
-  const botId = conv.members.find((member) => member != senderId);
-
-  const messagelist = await Message.find({
-    conversationId: conversationId,
-  })
-    .sort({ createdAt: -1 })
-    .limit(20);
-
-  messagelist.forEach((message) => {
-    if (message.senderId == senderId) {
-      currentMessages.push({
-        role: "user",
-        parts: message.text,
-      });
-    } else {
-      currentMessages.push({
-        role: "model",
-        parts: message.text,
-      });
-    }
-  });
-
-  // reverse currentMessages
-  currentMessages = currentMessages.reverse();
-
   try {
+    // Retrieve conversation data
+    const conv = await Conversation.findById(conversationId);
+    if (!conv) {
+      return "Conversation not found";
+    }
+    
+    const botId = conv.members.find((member) => member != senderId);
+    
+    // Get recent message history (newest first)
+    const messagelist = await Message.find({
+      conversationId: conversationId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(20);
+    
+    // Format messages for the AI model
+    let currentMessages = [];
+    messagelist.forEach((message) => {
+      if (message.senderId == senderId) {
+        currentMessages.push({
+          role: "user",
+          parts: message.text,
+        });
+      } else {
+        currentMessages.push({
+          role: "model",
+          parts: message.text,
+        });
+      }
+    });
+    
+    // Reverse to chronological order
+    currentMessages = currentMessages.reverse();
+    
+    // Check if prompt is health-related
+    const isHealthRelated = checkIfHealthRelated(prompt);
+    
+    // Modify prompt for health-related queries
+    let modifiedPrompt = prompt;
+    if (isHealthRelated) {
+      modifiedPrompt = `The following is a health-related question. Please provide general educational information only with appropriate context. give them suggestions: ${prompt}`;
+    }
+    
+    // Initialize chat and send message
     const chat = model.startChat({
       history: currentMessages,
       generationConfig: {
         maxOutputTokens: 2000,
       },
     });
-
-    const result = await chat.sendMessage(prompt);
+    
+    // Get response from model
+    const result = await chat.sendMessage(modifiedPrompt);
     const response = result.response;
-    var responseText = response.text();
-
+    let responseText = response.text();
+    
+    // Handle empty or too long responses
     if (responseText.length < 1) {
-      responseText = "Woops!! thats soo long ask me something in short.";
+      responseText = "I apologize, but I couldn't generate a proper response. Could you please rephrase your question more concisely?";
       return -1;
     }
-
+    
+    // Save user message
     await Message.create({
       conversationId: conversationId,
       senderId: senderId,
       text: prompt,
       seenBy: [{ user: botId, seenAt: new Date() }],
     });
-
+    
+    // Save bot response
     const botMessage = await Message.create({
       conversationId: conversationId,
       senderId: botId,
       text: responseText,
     });
-
+    
+    // Update conversation with latest message
     conv.latestmessage = responseText;
     await conv.save();
-
+    
     return botMessage;
   } catch (error) {
-    console.log(error.message);
-    return "some error occured while generating response";
+    console.error("Error in getAiResponse:", error);
+    return "An error occurred while generating a response. Please try again later.";
   }
 };
 
+// Helper function to detect health-related queries
+function checkIfHealthRelated(text) {
+  const healthKeywords = [
+    'health', 'medical', 'doctor', 'hospital', 'clinic',
+    'symptom', 'disease', 'illness', 'diagnosis', 'treatment',
+    'medicine', 'medication', 'drug', 'prescription', 'therapy',
+    'pain', 'ache', 'injury', 'wound', 'surgery',
+    'blood', 'heart', 'lung', 'brain', 'cancer',
+    'diabetes', 'allergy', 'infection', 'virus', 'diet','fever','medicine'
+  ];
+  
+  // Check if any health keywords are present in the text
+  return healthKeywords.some(keyword => 
+    text.toLowerCase().includes(keyword)
+  );
+}
+
+// module.exports = { getAiResponse };
 const sendMessageHandler = async (data) => {
   const {
     text,

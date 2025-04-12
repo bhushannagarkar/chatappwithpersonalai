@@ -68,9 +68,9 @@ const register = async (req, res) => {
 
     const us = await User.findOne({ email: email });
     us._id = new ObjectId();
-    us.name = "AI Chatbot";
+    us.name = "Health Assistant";
     us.email = email + "bot";
-    us.about = "I am an AI Chatbot to help you";
+    us.about = "I am an Health Assistant to help you";
     us.profilePic =
       "https://play-lh.googleusercontent.com/Oe0NgYQ63TGGEr7ViA2fGA-yAB7w2zhMofDBR3opTGVvsCFibD8pecWUjHBF_VnVKNdJ";
     await User.insertMany(us);
