@@ -1,6 +1,4 @@
-import React from "react";
-import { useEffect } from "react";
-import { useState } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   Box,
   Divider,
@@ -10,6 +8,9 @@ import {
   InputLeftElement,
   Text,
   Button,
+  useColorModeValue,
+  ScaleFade,
+  Tooltip,
 } from "@chakra-ui/react";
 import {
   AddIcon,
@@ -17,8 +18,24 @@ import {
   ChevronRightIcon,
   Search2Icon,
 } from "@chakra-ui/icons";
-import { useContext } from "react";
 import chatContext from "../../context/chatContext";
+
+const scrollbarConfig = {
+  "&::-webkit-scrollbar": {
+    width: "6px",
+  },
+  "&::-webkit-scrollbar-thumb": {
+    backgroundColor: "purple.300",
+    borderRadius: "24px",
+    transition: "background-color 0.2s",
+  },
+  "&::-webkit-scrollbar-thumb:hover": {
+    backgroundColor: "purple.400",
+  },
+  "&::-webkit-scrollbar-track": {
+    backgroundColor: "transparent",
+  },
+};
 
 const NewChats = (props) => {
   const [data, setData] = useState([]);
@@ -34,6 +51,13 @@ const NewChats = (props) => {
     setActiveChatId,
   } = context;
 
+  // Color mode values
+  const bgColor = useColorModeValue("white", "gray.800");
+  const hoverBg = useColorModeValue("purple.50", "purple.900");
+  const textColor = useColorModeValue("gray.800", "white");
+  const subTextColor = useColorModeValue("gray.500", "gray.400");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+
   const fetchNonFriendsList = async () => {
     try {
       const response = await fetch(`${hostName}/user/non-friends`, {
@@ -43,30 +67,26 @@ const NewChats = (props) => {
           "auth-token": localStorage.getItem("token"),
         },
       });
-      if (!response.ok) {
-        throw new Error("Failed to fetch data");
-      }
+      if (!response.ok) throw new Error("Failed to fetch non-friends list");
       const jsonData = await response.json();
       setData(jsonData);
       setUsers(jsonData);
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching non-friends list:", error);
     }
   };
 
   useEffect(() => {
-    async function fetchList() {
-      await fetchNonFriendsList();
-    }
-    fetchList();
+    fetchNonFriendsList();
   }, [myChatList]);
 
-  const handleUserSearch = async (e) => {
-    if (e.target.value !== "") {
-      const newusers = data.filter((user) =>
-        user.name.toLowerCase().includes(e.target.value.toLowerCase())
+  const handleUserSearch = (e) => {
+    const query = e.target.value.toLowerCase();
+    if (query) {
+      const filteredUsers = data.filter((user) =>
+        user.name.toLowerCase().includes(query)
       );
-      setUsers(newusers);
+      setUsers(filteredUsers);
     } else {
       setUsers(data);
     }
@@ -85,9 +105,7 @@ const NewChats = (props) => {
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch data");
-      }
+      if (!response.ok) throw new Error("Failed to create Conversation");
       const data = await response.json();
 
       setMyChatList([data, ...myChatList]);
@@ -100,96 +118,121 @@ const NewChats = (props) => {
         userId: user._id,
       });
 
-      setUsers((users) => users.filter((user) => user._id !== receiverid));
+      setUsers((prevUsers) => prevUsers.filter((u) => u._id !== receiverid));
     } catch (error) {
-      console.log(error);
+      console.error("Error creating new chat:", error);
     }
   };
 
   return (
-    <>
-      <Box>
-        <Flex justify={"space-between"}>
-          <Button onClick={() => props.setactiveTab(0)}>
-            <ArrowBackIcon />
-          </Button>
-
-          <Box display={"flex"}>
-            <InputGroup w={"fit-content"} mx={2}>
-              <InputLeftElement pointerEvents="none">
-                <Search2Icon color="gray.300" />
-              </InputLeftElement>
-              <Input
-                type="text"
-                placeholder="Enter Name"
-                onChange={handleUserSearch}
-                id="search-input"
-              />
-            </InputGroup>
-          </Box>
-        </Flex>
-      </Box>
-
-      <Divider my={2} />
-
-      <Box
-        h={{ base: "63vh", md: "72vh" }}
-        overflowY={"scroll"}
-        sx={{
-          "::-webkit-scrollbar": {
-            width: "4px",
-          },
-          "::-webkit-scrollbar-track": {
-            width: "6px",
-          },
-          "::-webkit-scrollbar-thumb": {
-            background: { base: "gray.300", md: "gray.500" },
-            borderRadius: "24px",
-          },
-        }}
+    <Box
+      h="100%"
+      bg={bgColor}
+      borderRadius={{ base: 0, md: "lg" }}
+      overflow="hidden"
+      boxShadow={{ base: "none", md: "md" }}
+      display="flex"
+      flexDirection="column"
+    >
+      <Flex
+        p={{ base: 2, md: 4 }}
+        justify="space-between"
+        align="center"
+        borderBottomWidth="1px"
+        borderColor={borderColor}
       >
-        <Button my={2} mx={2} colorScheme="purple">
-          Create New Group <AddIcon ml={2} fontSize={"12px"} />
+        <Button
+          onClick={() => props.setactiveTab(0)}
+          variant="ghost"
+          colorScheme="purple"
+          leftIcon={<ArrowBackIcon />}
+          size="md"
+          _hover={{ bg: hoverBg }}
+        >
+          Back
         </Button>
+        <InputGroup maxW={{ base: "70%", md: "300px" }} size="md">
+          <InputLeftElement>
+            <Search2Icon color="gray.400" />
+          </InputLeftElement>
+          <Input
+            placeholder="Search users"
+            onChange={handleUserSearch}
+            borderRadius="full"
+            bg={useColorModeValue("gray.100", "gray.700")}
+            _focus={{ borderColor: "purple.500", boxShadow: "0 0 0 1px purple.500" }}
+          />
+        </InputGroup>
+      </Flex>
+
+      <Box flex={1} overflowY="auto" px={{ base: 2, md: 3 }} py={2} sx={scrollbarConfig}>
+        <Button
+          colorScheme="purple"
+          size="md"
+          borderRadius="full"
+          leftIcon={<AddIcon />}
+          mb={3}
+          w="full"
+          _hover={{ transform: "scale(1.02)" }}
+          transition="all 0.2s"
+        >
+          Create New Group
+        </Button>
+
         {users.map(
-          (user) =>
-            user._id !== context.user._id && (
-              <Flex key={user._id} p={2}>
-                <Button
-                  h={"4em"}
-                  w={"100%"}
-                  justifyContent={"space-between"}
-                  onClick={(e) => handleNewChat(e, user._id)}
+          (u) =>
+            u._id !== user._id && (
+              <ScaleFade key={u._id} initialScale={0.95} in={true}>
+                <Flex
+                  p={2}
+                  borderRadius="md"
+                  _hover={{ bg: hoverBg }}
+                  transition="all 0.2s"
+                  cursor="pointer"
+                  onClick={(e) => handleNewChat(e, u._id)}
                 >
-                  <Flex>
-                    <Box>
+                  <Flex align="center" flex={1}>
+                    <Box flexShrink={0}>
                       <img
-                        src={user.profilePic}
+                        src={u.profilePic || "https://cdn.pixabay.com/photo/2023/06/15/15/37/ai-8063177_1280.jpg"}
                         alt="profile"
                         style={{
-                          width: "40px",
-                          height: "40px",
+                          width: "45px",
+                          height: "45px",
                           borderRadius: "50%",
+                          objectFit: "cover",
                         }}
                       />
                     </Box>
-                    <Box mx={3} textAlign={"start"}>
-                      <Text fontSize={"lg"} fontWeight={"bold"}>
-                        {user.name}
+                    <Box ml={3} flex={1} minW={0}>
+                      <Text
+                        fontSize="md"
+                        fontWeight="medium"
+                        color={textColor}
+                        noOfLines={1}
+                      >
+                        {u.name}
                       </Text>
-                      <Text fontSize={"sm"} color={"gray.500"}>
-                        {user.phoneNum}
+                      <Text fontSize="sm" color={subTextColor} noOfLines={1}>
+                        {u.phoneNum}
                       </Text>
                     </Box>
                   </Flex>
-
-                  <ChevronRightIcon />
-                </Button>
-              </Flex>
+                  <Tooltip label="Start chat" placement="left">
+                    <Button
+                      variant="ghost"
+                      colorScheme="purple"
+                      size="sm"
+                      rightIcon={<ChevronRightIcon />}
+                      _hover={{ bg: "purple.100" }}
+                    />
+                  </Tooltip>
+                </Flex>
+              </ScaleFade>
             )
         )}
       </Box>
-    </>
+    </Box>
   );
 };
 

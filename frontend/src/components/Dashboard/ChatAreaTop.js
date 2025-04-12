@@ -3,21 +3,26 @@ import {
   Flex,
   Text,
   Button,
-  Image,
+  Avatar,
   Tooltip,
   SkeletonCircle,
   Skeleton,
-  Circle,
-  Stack,
+  Badge,
+  useColorMode,
+  useBreakpointValue,
+  IconButton,
+  SlideFade,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { ArrowBackIcon } from "@chakra-ui/icons";
+import { ArrowBackIcon, ChevronDownIcon } from "@chakra-ui/icons";
 import React, { useContext, useEffect } from "react";
 import chatContext from "../../context/chatContext";
 import { ProfileModal } from "../miscellaneous/ProfileModal";
-import { useDisclosure } from "@chakra-ui/react";
 
 const ChatAreaTop = () => {
   const context = useContext(chatContext);
+  const { colorMode } = useColorMode();
+  const isMobile = useBreakpointValue({ base: true, md: false });
 
   const {
     receiver,
@@ -33,12 +38,10 @@ const ChatAreaTop = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   const getReceiverOnlineStatus = async () => {
-    if (!receiver._id) {
-      return;
-    }
+    if (!receiver._id) return;
 
     try {
-      const repsonse = await fetch(
+      const response = await fetch(
         `${hostName}/user/online-status/${receiver._id}`,
         {
           method: "GET",
@@ -48,12 +51,15 @@ const ChatAreaTop = () => {
           },
         }
       );
-      const data = await repsonse.json();
-      setReceiver((receiver) => ({
-        ...receiver,
+      const data = await response.json();
+      setReceiver((prev) => ({
+        ...prev,
         isOnline: data.isOnline,
+        lastSeen: data.lastSeen || prev.lastSeen,
       }));
-    } catch (error) {}
+    } catch (error) {
+      console.error("Error fetching online status:", error);
+    }
   };
 
   const handleBack = () => {
@@ -64,108 +70,135 @@ const ChatAreaTop = () => {
   };
 
   const getLastSeenString = (lastSeen) => {
-    var lastSeenString = "last seen ";
-    if (new Date(lastSeen).toDateString() === new Date().toDateString()) {
-      lastSeenString += "today ";
-    } else if (
-      new Date(lastSeen).toDateString() ===
-      new Date(new Date().setDate(new Date().getDate() - 1)).toDateString()
-    ) {
-      lastSeenString += "yesterday ";
+    if (!lastSeen) return "never been online";
+    
+    const now = new Date();
+    const seenDate = new Date(lastSeen);
+    const diffInHours = Math.floor((now - seenDate) / (1000 * 60 * 60));
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor((now - seenDate) / (1000 * 60));
+      return `last seen ${diffInMinutes} minute${diffInMinutes !== 1 ? 's' : ''} ago`;
+    } else if (diffInHours < 24) {
+      return `last seen ${diffInHours} hour${diffInHours !== 1 ? 's' : ''} ago`;
+    } else if (seenDate.toDateString() === new Date(now.setDate(now.getDate() - 1)).toDateString()) {
+      return "last seen yesterday";
     } else {
-      lastSeenString += `on ${new Date(lastSeen).toLocaleDateString()} `;
+      return `last seen on ${seenDate.toLocaleDateString()}`;
     }
-
-    lastSeenString += `at ${new Date(lastSeen).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    })}`;
-
-    return lastSeenString;
   };
 
   useEffect(() => {
     getReceiverOnlineStatus();
   }, [receiver?._id]);
-  return (
-    <>
-      <Flex w={"100%"}>
-        <Button
-          borderRadius={0}
-          height={"inherit"}
-          onClick={() => handleBack()}
-        >
-          <ArrowBackIcon />
-        </Button>
-        <Tooltip label="View Profile">
-          <Button
-            w={"100%"}
-            mr={0}
-            p={2}
-            h={"max-content"}
-            justifyContent={"space-between"}
-            borderRadius={"0px"}
-            onClick={onOpen}
-          >
-            {isChatLoading ? (
-              <>
-                <Flex>
-                  <SkeletonCircle size="10" mx={2} />
-                  <Skeleton
-                    height="20px"
-                    width="250px"
-                    borderRadius={"md"}
-                    my={2}
-                  />
-                </Flex>
-              </>
-            ) : (
-              <>
-                <Flex gap={2} alignItems={"center"}>
-                  <Image
-                    borderRadius="full"
-                    boxSize="40px"
-                    src={receiver.profilePic}
-                    alt=""
-                  />
 
-                  <Stack
-                    justifyContent={"center"}
-                    m={0}
-                    p={0}
-                    lineHeight={1}
-                    gap={0}
-                    textAlign={"left"}
+  return (
+    <Box
+      width="100%"
+      bg={colorMode === "dark" ? "gray.800" : "white"}
+      borderBottomWidth="1px"
+      borderBottomColor={colorMode === "dark" ? "gray.700" : "gray.200"}
+      boxShadow="sm"
+      position="relative"
+      zIndex={1}
+    >
+      <Flex
+        width="100%"
+        height="72px"
+        alignItems="center"
+        px={{ base: 2, md: 4 }}
+        py={2}
+      >
+        {isMobile && (
+          <IconButton
+            icon={<ArrowBackIcon />}
+            onClick={handleBack}
+            variant="ghost"
+            aria-label="Back to chats"
+            mr={2}
+            borderRadius="full"
+          />
+        )}
+
+        {isChatLoading ? (
+          <Flex alignItems="center" flex={1}>
+            <SkeletonCircle size="12" />
+            <Box ml={3} flex={1}>
+              <Skeleton height="20px" width="70%" mb={2} />
+              <Skeleton height="14px" width="50%" />
+            </Box>
+          </Flex>
+        ) : (
+          <Tooltip
+            label={receiver.isOnline ? "Online now" : getLastSeenString(receiver.lastSeen)}
+            placement="bottom-start"
+            hasArrow
+          >
+            <Button
+              flex={1}
+              height="100%"
+              variant="ghost"
+              onClick={onOpen}
+              display="flex"
+              alignItems="center"
+              justifyContent="flex-start"
+              px={3}
+              borderRadius="lg"
+              _hover={{
+                bg: colorMode === "dark" ? "gray.700" : "gray.100",
+              }}
+              _active={{
+                bg: colorMode === "dark" ? "gray.600" : "gray.200",
+              }}
+              rightIcon={!isMobile ? <ChevronDownIcon /> : null}
+            >
+              <Avatar
+                size="md"
+                name={receiver.name}
+                src={receiver.profilePic}
+                mr={3}
+              />
+              <Box textAlign="left">
+                <Flex alignItems="center">
+                  <Text
+                    fontSize={{ base: "md", md: "lg" }}
+                    fontWeight="semibold"
+                    noOfLines={1}
+                    mr={2}
                   >
-                    <Text mx={1} my={receiver.isOnline ? 0 : 2} fontSize="2xl">
-                      {receiver.name}
-                    </Text>
-                    {receiver.isOnline ? (
-                      <Text mx={1} fontSize={"small"}>
-                        <Circle
-                          size="2"
-                          bg="green.500"
-                          display="inline-block"
-                          borderRadius="full"
-                          mx={1}
-                        />
-                        active now
-                      </Text>
-                    ) : (
-                      <Text my={0} mx={1} fontSize={"xx-small"}>
-                        {getLastSeenString(receiver.lastSeen)}
-                      </Text>
-                    )}
-                  </Stack>
+                    {receiver.name}
+                  </Text>
+                  {receiver.isOnline && (
+                    <SlideFade in={receiver.isOnline} offsetY={-5}>
+                      <Badge
+                        colorScheme="green"
+                        variant="subtle"
+                        fontSize="xx-small"
+                        borderRadius="full"
+                        px={2}
+                      >
+                        Online
+                      </Badge>
+                    </SlideFade>
+                  )}
                 </Flex>
-              </>
-            )}
-          </Button>
-        </Tooltip>
+                {!receiver.isOnline && (
+                  <Text
+                    fontSize="xs"
+                    color={colorMode === "dark" ? "gray.400" : "gray.500"}
+                    mt={0.5}
+                  >
+                    {getLastSeenString(receiver.lastSeen)}
+                  </Text>
+                )}
+              </Box>
+            </Button>
+          </Tooltip>
+        )}
       </Flex>
 
       <ProfileModal isOpen={isOpen} onClose={onClose} user={receiver} />
-    </>
+    </Box>
   );
 };
 

@@ -1,115 +1,171 @@
-import React, { useContext, useState } from "react";
-import { Box, Button, Flex, Text, Link, useDisclosure } from "@chakra-ui/react";
-import { FaGithub, FaMoon, FaSun } from "react-icons/fa";
-import ProfileMenu from "./ProfileMenu";
+import React, { useContext, useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Flex,
+  Text,
+  Link,
+  useDisclosure,
+  useColorMode,
+  useBreakpointValue,
+  IconButton,
+  Tooltip,
+  SlideFade,
+  Avatar,
+  Menu,
+  MenuButton,
+  MenuList,
+  MenuItem,
+  useToast,
+} from "@chakra-ui/react";
+import { FaGithub, FaMoon, FaSun, FaUserCircle } from "react-icons/fa";
+import { FiLogOut } from "react-icons/fi";
 import chatContext from "../../context/chatContext";
 
-const Navbar = (props) => {
+const Navbar = ({ toggleColorMode }) => {
   const context = useContext(chatContext);
-  const { isAuthenticated } = context;
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const colormode = localStorage.getItem("chakra-ui-color-mode");
-  const [icon, seticon] = useState(
-    colormode === "dark" ? <FaSun /> : <FaMoon />
-  );
-
+  const { isAuthenticated, user, setIsAuthenticated } = context;
+  const { colorMode } = useColorMode();
+  const isMobile = useBreakpointValue({ base: true, md: false });
+  const toast = useToast();
+  
+  const [icon, setIcon] = useState(colorMode === "dark" ? <FaSun /> : <FaMoon />);
   const path = window.location.pathname;
 
+  useEffect(() => {
+    setIcon(colorMode === "dark" ? <FaSun /> : <FaMoon />);
+  }, [colorMode]);
+
   const handleToggle = () => {
-    if (colormode === "dark") {
-      seticon(<FaMoon />);
-      props.toggleColorMode();
-    } else {
-      seticon(<FaSun />);
-      props.toggleColorMode();
-    }
+    toggleColorMode();
+    setIcon(colorMode === "dark" ? <FaMoon /> : <FaSun />);
   };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsAuthenticated(false);
+    toast({
+      title: "Logged out successfully",
+      status: "success",
+      duration: 3000,
+      isClosable: true,
+    });
+  };
+
+  const ProfileMenu = () => (
+    <Menu>
+      <MenuButton
+        as={Button}
+        variant="ghost"
+        borderRadius="full"
+        p={0}
+        ml={2}
+      >
+        <Avatar
+          size="sm"
+          name={user?.name}
+          src={user?.pic}
+          icon={<FaUserCircle fontSize="1.2rem" />}
+        />
+      </MenuButton>
+      <MenuList>
+        <MenuItem icon={<FiLogOut />} onClick={handleLogout}>
+          Logout
+        </MenuItem>
+      </MenuList>
+    </Menu>
+  );
 
   return (
     <>
-      {!path.includes("dashboard") && (
+      {/* Mobile View */}
+      {!path.includes("dashboard") && isMobile && (
         <Box
-          position={"absolute"}
-          top={5}
-          left={5}
-          display={{
-            md: "none",
-            base: "flex",
-          }}
+          position="fixed"
+          top={4}
+          left={4}
+          zIndex="dropdown"
+          display="flex"
+          gap={2}
         >
-          <Button
-            p={3}
-            borderRadius={"full"}
-            borderWidth={1}
-            fontSize={"small"}
-            backgroundColor={"transparent"}
-            onClick={handleToggle}
-            mx={1}
-          >
-            {icon}
-          </Button>
-          <Link
-            p={3}
-            borderRadius={"full"}
-            borderWidth={1}
-            fontSize={"small"}
-            backgroundColor={"transparent"}
-            href="https://github.com/"
-            mx={1}
-          >
-            <FaGithub />
-          </Link>
+          <Tooltip label={colorMode === "dark" ? "Light mode" : "Dark mode"}>
+            <IconButton
+              aria-label="Toggle color mode"
+              icon={icon}
+              onClick={handleToggle}
+              variant="ghost"
+              borderRadius="full"
+              size="sm"
+            />
+          </Tooltip>
+          <Tooltip label="View GitHub repository">
+            <IconButton
+              as={Link}
+              href="https://github.com/"
+              target="_blank"
+              aria-label="GitHub repository"
+              icon={<FaGithub />}
+              variant="ghost"
+              borderRadius="full"
+              size="sm"
+            />
+          </Tooltip>
         </Box>
       )}
-      <Box
-        p={3}
-        w={{ base: "94vw", md: "99vw" }}
-        m={2}
-        borderRadius="10px"
-        borderWidth="2px"
-        display={{
-          base: "none",
-          md: "block",
-        }}
-      >
-        <Flex justify={"space-between"}>
-          <Text fontSize="2xl">Conversa</Text>
 
-          <Box
-            display={{ base: "none", md: "block" }}
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Button
-              onClick={handleToggle}
-              mr={2}
-              borderRadius={"full"}
-              borderWidth={1}
-              fontSize={"small"}
-              backgroundColor={"transparent"}
-              p={3}
-            >
-              {icon}
-            </Button>
-            <Button
-              borderRadius={"full"}
-              borderWidth={1}
-              fontSize={"small"}
-              backgroundColor={"transparent"}
-              p={3}
-              mr={2}
-              onClick={() => {
-                window.open("https://github.com");
-              }}
-            >
-              <FaGithub />
-            </Button>
-            {isAuthenticated && (
-              <ProfileMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose} />
-            )}
-          </Box>
-        </Flex>
-      </Box>
+      {/* Desktop View */}
+      {!isMobile && (
+        <Box
+          p={3}
+          w="full"
+          mx="auto"
+          maxW="container.xl"
+          borderRadius="lg"
+          bg={colorMode === "dark" ? "gray.800" : "white"}
+          boxShadow="sm"
+          position="sticky"
+          top={2}
+          zIndex="sticky"
+        >
+          <Flex justify="space-between" align="center">
+            <Text fontSize="xl" fontWeight="bold" bgGradient="linear(to-r, blue.400, purple.500)" bgClip="text">
+            Health Assistant
+            </Text>
+
+            <Flex align="center" gap={2}>
+              <Tooltip label={colorMode === "dark" ? "Light mode" : "Dark mode"}>
+                <IconButton
+                  aria-label="Toggle color mode"
+                  icon={icon}
+                  onClick={handleToggle}
+                  variant="ghost"
+                  borderRadius="full"
+                  size="sm"
+                />
+              </Tooltip>
+              
+              <Tooltip label="View GitHub repository">
+                <IconButton
+                  as={Link}
+                  href="https://github.com/"
+                  target="_blank"
+                  aria-label="GitHub repository"
+                  icon={<FaGithub />}
+                  variant="ghost"
+                  borderRadius="full"
+                  size="sm"
+                />
+              </Tooltip>
+
+              {isAuthenticated && (
+                <SlideFade in={isAuthenticated} offsetY={-10}>
+                  <ProfileMenu />
+                </SlideFade>
+              )}
+            </Flex>
+          </Flex>
+        </Box>
+      )}
     </>
   );
 };

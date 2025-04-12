@@ -1,4 +1,3 @@
-import chatContext from "../../context/chatContext";
 import { useState, useContext } from "react";
 import {
   Flex,
@@ -8,103 +7,167 @@ import {
   InputGroup,
   Stack,
   InputLeftElement,
+  chakra,
   Box,
   Link,
   Avatar,
   FormControl,
+  FormHelperText,
   InputRightElement,
   Card,
   CardBody,
   useToast,
+  Spinner,
+  Text,
+  VStack,
+  HStack,
+  useColorModeValue,
+  Icon,
 } from "@chakra-ui/react";
-import { LockIcon } from "@chakra-ui/icons";
+import { FaUserAlt, FaLock, FaEnvelope } from "react-icons/fa";
+import chatContext from "../../context/chatContext";
+
+const CFaLock = chakra(FaLock);
+const CFaEnvelope = chakra(FaEnvelope);
+const CFaUserAlt = chakra(FaUserAlt);
 
 const Signup = (props) => {
   const context = useContext(chatContext);
-  const {hostName} = context
+  const { hostName } = context;
   const toast = useToast();
 
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmpassword: ""
+  });
 
-  const [name, setname] = useState("");
-  const [email, setemail] = useState("");
-  const [password, setpassword] = useState("");
-  const [confirmpassword, setconfirmpassword] = useState("");
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmpassword: ""
+  });
 
   const handletabs = props.handleTabsChange;
 
-  function showtoast(description) {
-    toast({
-      title: "An error occurred.",
-      description: description,
-      status: "error",
-      duration: 5000,
-      isClosable: true,
-    });
-  }
+  // Theme colors
+  const cardBg = useColorModeValue("white", "gray.800");
+  const inputBg = useColorModeValue("gray.50", "gray.700");
+  const textColor = useColorModeValue("gray.800", "white");
+  const mutedColor = useColorModeValue("gray.600", "gray.400");
+  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const bgGradient = "linear(to-r, purple.400, purple.600)";
+  const hoverBg = useColorModeValue("purple.50", "rgba(128, 90, 213, 0.12)");
 
-  const handleShowClick = () => setShowPassword(!showPassword);
+  const validateForm = () => {
+    const newErrors = {
+      name: "",
+      email: "",
+      password: "",
+      confirmpassword: ""
+    };
+    let isValid = true;
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required";
+      isValid = false;
+    } else if (formData.name.length < 3 || formData.name.length > 20) {
+      newErrors.name = "Name must be 3-20 characters";
+      isValid = false;
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+      isValid = false;
+    } else if (formData.email.length > 50) {
+      newErrors.email = "Email too long";
+      isValid = false;
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required";
+      isValid = false;
+    } else if (formData.password.length < 8 || formData.password.length > 20) {
+      newErrors.password = "Password must be 8-20 characters";
+      isValid = false;
+    }
+
+    if (formData.password !== formData.confirmpassword) {
+      newErrors.confirmpassword = "Passwords don't match";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value
+    });
+  };
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    
+    if (!validateForm()) return;
 
-    if (email === "" || name === "" || password === "") {
-      showtoast("All fields are required");
-      return;
-    } else if (name.length > 20 || name.length < 3) {
-      showtoast("Name should be atlest 3 and atmost 20 characters long");
-      return;
-    } else if (!email.includes("@") || !email.includes(".")) {
-      showtoast("Invalid email");
-      return;
-    } else if (email.length > 50) {
-      showtoast("Email should be atmost 50 characters long");
-      return;
-    } else if (password.length < 8 || password.length > 20) {
-      showtoast("Invalid Password");
-      return;
-    } else if (password !== confirmpassword) {
-      showtoast("Passwords do not match");
-      return;
-    } else {
-      const payload = {
-        email,
-        name,
-        password,
-      };
+    setIsSubmitting(true);
 
-      toast.promise(
-        fetch(`${hostName}/auth/register`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        })
-          .then((response) => {
-            if (response.status !== 200) {
-              response.json().then((resdata) => {});
-              throw new Error("Failed to fetch data");
-            } else {
-              response.json().then((resdata) => {
-                localStorage.setItem("token", resdata.authtoken);
-                handletabs(0);
-              });
-            }
-          })
-          .catch((error) => {}),
-        {
-          loading: { title: "Creating account...", description: "please wait" },
-          success: {
-            title: "Account created.",
-            description: "We have created your account for you.",
-          },
-          error: {
-            title: "An error occurred.",
-            description: "We were unable to create your account.",
-          },
-        }
-      );
+    const payload = {
+      email: formData.email,
+      name: formData.name,
+      password: formData.password
+    };
+
+    try {
+      const response = await fetch(`${hostName}/auth/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const resdata = await response.json();
+
+      if (!response.ok) {
+        throw new Error(resdata.message || "Failed to create account");
+      }
+
+      localStorage.setItem("token", resdata.authtoken);
+      handletabs(0);
+
+      toast({
+        title: "Account created!",
+        description: "Welcome to our community!",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+        variant: "solid",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create account",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+        position: "top",
+        variant: "solid",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -112,132 +175,213 @@ const Signup = (props) => {
     <Flex
       flexDirection="column"
       width="100%"
-      height="70vh"
+      minH="80vh"
       justifyContent="center"
       alignItems="center"
-      borderRadius={15}
+      px={{ base: 4, md: 8 }}
+      py={8}
+      position="relative"
+      overflow="hidden"
+      bg={useColorModeValue("gray.50", "gray.800")}
     >
-      <Stack
-        flexDir="column"
-        mb="2"
-        justifyContent="center"
-        alignItems="center"
-      >
-        <Avatar bg="purple.300" />
-        <Heading color="pruple.400">Welcome</Heading>
-        <Card minW={{ base: "90%", md: "468px" }} borderRadius={15} shadow={0}>
-          <CardBody p={0}>
-            <form>
-              <Stack spacing={4}>
-                <FormControl>
-                  <InputGroup
-                    borderEndRadius={"10px"}
-                    borderStartRadius={"10px"}
-                    size={"lg"}
-                  >
+      {/* Decorative background elements */}
+      <Box
+        position="absolute"
+        top="-10%"
+        right="-10%"
+        width="300px"
+        height="300px"
+        borderRadius="full"
+        bgGradient={bgGradient}
+        opacity="0.1"
+        zIndex="-1"
+      />
+      <Box
+        position="absolute"
+        bottom="-15%"
+        left="-10%"
+        width="350px"
+        height="350px"
+        borderRadius="full"
+        bgGradient={bgGradient}
+        opacity="0.1"
+        zIndex="-1"
+      />
+
+      <VStack spacing={6} width="100%" maxW="480px">
+        <Avatar 
+          size="xl" 
+          bg="purple.500" 
+          icon={<Icon as={FaUserAlt} color="white" w={8} h={8} />}
+          shadow="lg"
+        />
+        
+        <Heading 
+          fontSize={{ base: "2xl", md: "3xl" }} 
+          fontWeight="bold" 
+          color={textColor}
+          textAlign="center"
+        >
+          Create Your Account
+        </Heading>
+        
+        <Text color={mutedColor} textAlign="center" pb={2} fontSize="md">
+          Join our community and start your journey today
+        </Text>
+
+        <Card 
+          width="100%" 
+          borderRadius="xl" 
+          bg={cardBg} 
+          shadow="lg"
+          borderWidth="1px"
+          borderColor={borderColor}
+          overflow="hidden"
+        >
+          <CardBody p={{ base: 6, md: 8 }}>
+            <form onSubmit={handleSignup}>
+              <VStack spacing={5}>
+                <FormControl isInvalid={!!errors.name}>
+                  <InputGroup size="lg">
+                    <InputLeftElement
+                      pointerEvents="none"
+                      children={<CFaUserAlt color="gray.400" />}
+                    />
                     <Input
+                      name="name"
                       type="text"
-                      placeholder="Enter your name"
+                      placeholder="Full name"
+                      value={formData.name}
+                      bg={inputBg}
+                      borderRadius="md"
                       focusBorderColor="purple.500"
-                      onChange={(e) => setname(e.target.value)}
-                      required
+                      onChange={handleInputChange}
                     />
                   </InputGroup>
+                  <FormHelperText color="red.500" fontSize="sm">
+                    {errors.name}
+                  </FormHelperText>
                 </FormControl>
 
-                <FormControl>
-                  <InputGroup
-                    borderEndRadius={"10px"}
-                    borderStartRadius={"10px"}
-                    size={"lg"}
-                  >
+                <FormControl isInvalid={!!errors.email}>
+                  <InputGroup size="lg">
+                    <InputLeftElement
+                      pointerEvents="none"
+                      children={<CFaEnvelope color="gray.400" />}
+                    />
                     <Input
+                      name="email"
                       type="email"
                       placeholder="Email address"
+                      value={formData.email}
+                      bg={inputBg}
+                      borderRadius="md"
                       focusBorderColor="purple.500"
-                      onChange={(e) => setemail(e.target.value)}
+                      onChange={handleInputChange}
                     />
                   </InputGroup>
+                  <FormHelperText color="red.500" fontSize="sm">
+                    {errors.email}
+                  </FormHelperText>
                 </FormControl>
 
-                <FormControl>
-                  <InputGroup
-                    borderEndRadius={"10px"}
-                    borderStartRadius={"10px"}
-                    size={"lg"}
-                  >
+                <FormControl isInvalid={!!errors.password}>
+                  <InputGroup size="lg">
                     <InputLeftElement
                       pointerEvents="none"
-                      color="gray.300"
-                      children={<LockIcon color="gray.300" />}
+                      children={<CFaLock color="gray.400" />}
                     />
                     <Input
+                      name="password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Password"
+                      value={formData.password}
+                      bg={inputBg}
+                      borderRadius="md"
                       focusBorderColor="purple.500"
-                      onChange={(e) => setpassword(e.target.value)}
+                      onChange={handleInputChange}
                     />
-                    <InputRightElement mx={1}>
+                    <InputRightElement width="4.5rem">
                       <Button
-                        fontSize={"x-small"}
-                        size={"xs"}
-                        onClick={handleShowClick}
+                        h="1.75rem"
+                        size="sm"
+                        onClick={() => setShowPassword(!showPassword)}
+                        variant="ghost"
                       >
                         {showPassword ? "Hide" : "Show"}
                       </Button>
                     </InputRightElement>
                   </InputGroup>
+                  <FormHelperText color="red.500" fontSize="sm">
+                    {errors.password}
+                  </FormHelperText>
+                </FormControl>
 
-                  <InputGroup
-                    borderEndRadius={"10px"}
-                    borderStartRadius={"10px"}
-                    size={"lg"}
-                    my={4}
-                  >
+                <FormControl isInvalid={!!errors.confirmpassword}>
+                  <InputGroup size="lg">
                     <InputLeftElement
                       pointerEvents="none"
-                      color="gray.300"
-                      children={<LockIcon color="gray.300" />}
+                      children={<CFaLock color="gray.400" />}
                     />
                     <Input
-                      textOverflow={"ellipsis"}
+                      name="confirmpassword"
                       type={showPassword ? "text" : "password"}
                       placeholder="Confirm Password"
+                      value={formData.confirmpassword}
+                      bg={inputBg}
+                      borderRadius="md"
                       focusBorderColor="purple.500"
-                      onChange={(e) => setconfirmpassword(e.target.value)}
+                      onChange={handleInputChange}
                     />
-                    <InputRightElement mx={1}>
-                      <Button
-                        fontSize={"x-small"}
-                        size={"xs"}
-                        onClick={handleShowClick}
-                      >
-                        {showPassword ? "Hide" : "Show"}
-                      </Button>
-                    </InputRightElement>
                   </InputGroup>
+                  <FormHelperText color="red.500" fontSize="sm">
+                    {errors.confirmpassword}
+                  </FormHelperText>
                 </FormControl>
+
                 <Button
-                  borderRadius={10}
                   type="submit"
-                  variant="solid"
-                  colorScheme="purple"
+                  size="lg"
                   width="full"
-                  onClick={handleSignup}
+                  mt={4}
+                  bgGradient={bgGradient}
+                  color="white"
+                  _hover={{
+                    bgGradient: "linear(to-r, purple.500, purple.700)",
+                    boxShadow: "md",
+                    transform: "translateY(-2px)",
+                  }}
+                  _active={{
+                    transform: "translateY(0)",
+                  }}
+                  borderRadius="md"
+                  fontWeight="semibold"
+                  transition="all 0.2s"
+                  isLoading={isSubmitting}
+                  loadingText="Signing up..."
                 >
-                  Signup
+                  Create Account
                 </Button>
-              </Stack>
+              </VStack>
             </form>
           </CardBody>
         </Card>
-      </Stack>
-      <Box>
-        Already have account?{" "}
-        <Link color="purple.500" onClick={() => handletabs(0)}>
-          login
-        </Link>
-      </Box>
+
+        <HStack spacing={1} pt={2}>
+          <Text color={mutedColor}>Already have an account?</Text>
+          <Link 
+            color="purple.500" 
+            fontWeight="semibold"
+            _hover={{ 
+              textDecoration: "underline",
+              color: "purple.600"
+            }}
+            onClick={() => handletabs(0)}
+          >
+            Sign In
+          </Link>
+        </HStack>
+      </VStack>
     </Flex>
   );
 };
